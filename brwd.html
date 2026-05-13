@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BRWD Kiosk System</title>
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+<style>
+    :root {
+        --slide-width: 300px;
+        --slide-height: 450px;
+        --animation-speed: 20s;
+        --primary-brown: #774e32;
+        --dark-brown: #5d3d27; 
+        --light-tan: #b6977d;
+        --sidebar-bg: #b7825f;
+    }
+
+    body { 
+        margin:0; 
+        font-family: Arial, sans-serif; 
+        background:#f4f1ee; 
+        overflow: hidden; 
+        height: 100vh;
+    }
+
+    .screen { 
+        display:none; 
+        height:100vh; 
+        width: 100vw; 
+        position: relative;
+    }
+
+    .active { display:flex; }
+
+    .menu-wrapper {
+        display: flex;
+        flex: 1;
+        height: 100vh;
+        width: 100%;
+        overflow: hidden;
+    }
+
+    .sidebar { 
+        width: 220px; 
+        background: var(--sidebar-bg); 
+        color:white; 
+        padding:20px 15px; 
+        text-align:center; 
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        z-index: 10;
+    }
+
+    .kiosk-logo-circle { 
+        width: 110px; 
+        height: 110px; 
+        object-fit: cover; 
+        border-radius: 50%; 
+        background: white;
+        margin: 0 auto 20px auto; 
+        display: block; 
+        padding: 5px;
+    }
+
+    .menu { 
+        flex: 1;
+        padding: 25px; 
+        display: grid; 
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        grid-auto-rows: min-content;
+        gap: 20px; 
+        background: var(--light-tan); 
+        overflow-y: auto; 
+    }
+
+    .card { 
+        background:white; 
+        border-radius:15px; 
+        text-align:center; 
+        padding: 15px;
+        cursor:pointer; 
+        font-weight:bold; 
+        transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s; 
+        color:#333;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    
+    .card:hover { 
+        transform: translateY(-8px); 
+        box-shadow: 0 12px 24px rgba(0,0,0,0.25); 
+    }
+    .card:active { transform: scale(0.95); }
+    .card img { width:100%; height:180px; object-fit:cover; border-radius:10px; margin-bottom:12px; }
+
+    .category { 
+        padding:15px; 
+        margin:10px 0; 
+        background: var(--dark-brown); 
+        border-radius:10px; 
+        cursor:pointer; 
+        font-weight: bold; 
+        letter-spacing: 1px;
+        transition: background 0.3s, transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s;
+    }
+    .category:hover { 
+        background: var(--primary-brown); 
+        transform: translateY(-3px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+    .category:active { transform: scale(0.98); }
+
+    .btn { 
+        width:200px; 
+        padding:15px; 
+        font-size:1.2rem; 
+        border:none; 
+        border-radius:15px; 
+        background:var(--primary-brown); 
+        color:white; 
+        cursor:pointer; 
+        font-weight: bold; 
+        transition: background 0.3s, transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .btn:hover { 
+        background: var(--dark-brown); 
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+    }
+
+    .btn:active { 
+        transform: translateY(-1px); 
+    }
+
+    /* ADD-ON ROW STYLES */
+    .addon-row {
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center;
+        margin-bottom: 5px; 
+        color: #333;
+        padding: 10px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background 0.2s, transform 0.2s;
+    }
+
+    .addon-row:hover {
+        background: #f0f0f0;
+        transform: translateX(5px);
+    }
+
+    .gcash-qr {
+        width: 100%;
+        max-height: 350px;
+        object-fit: contain;
+        border-radius: 10px;
+    }
+
+    @media (max-width: 768px) {
+        .menu-wrapper { flex-direction: column; }
+        .sidebar { 
+            width: 100%; 
+            height: auto; 
+            padding: 10px; 
+            flex-direction: row; 
+            overflow-x: auto; 
+            gap: 10px;
+            box-sizing: border-box;
+        }
+        .sidebar .kiosk-logo-circle, .sidebar #mode-display { display: none; }
+        .sidebar .category { margin: 0; padding: 10px 15px; font-size: 0.8rem; flex-shrink: 0; }
+        .menu { grid-template-columns: repeat(2, 1fr); padding: 15px; }
+    }
+
+    .cart-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; z-index: 9999; }
+    .cart { position: fixed; right: -100%; top: 0; width: 100%; max-width: 400px; height: 100%; background:#6f4e37; color:white; padding:20px; display: flex; flex-direction: column; z-index: 10000; transition: 0.4s; box-sizing: border-box; }
+    .cart.open { right: 0; }
+    #cart-items { flex-grow: 1; overflow-y: auto; margin: 20px 0; }
+    .modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); display:none; justify-content:center; align-items:center; z-index:9999; padding: 20px; }
+    .modal-box { background:white; padding:20px; border-radius:10px; width:100%; max-width:350px; }
+    #receiptPage, #gcashPage, #thankYouPage, #gcashInstructionPage { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(5px); flex-direction: column; align-items: center; justify-content: center; z-index: 20000; }
+    .slider-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0.4; z-index: 1; pointer-events: none; }
+    .slide-track { display: flex; animation: scroll-left var(--animation-speed) linear infinite; }
+    .slide { width: var(--slide-width); height: var(--slide-height); flex-shrink: 0; padding: 0 10px; }
+    .slide img { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; }
+    @keyframes scroll-left { 0% { transform: translateX(0); } 100% { transform: translateX(calc(var(--slide-width) * -5)); } }
+    #splash-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #b6977d; z-index: 20000; display: flex; justify-content: center; align-items: center; cursor: pointer; }
+    #welcome { background: #b6977d; flex-direction:column; justify-content:center; align-items:center; text-align: center; }
+</style>
+</head>
+<body>
+
+<div id="slideshow-template" style="display:none;">
+    <div class="slide-track">
+        <div class="slide"><img src="1.jpg" alt="1"></div>
+        <div class="slide"><img src="2.jpg" alt="2"></div>
+        <div class="slide"><img src="3.jpg" alt="3"></div>
+        <div class="slide"><img src="4.jpg" alt="4"></div>
+        <div class="slide"><img src="5.jpg" alt="5"></div>
+        <div class="slide"><img src="1.jpg" alt="1"></div>
+        <div class="slide"><img src="2.jpg" alt="2"></div>
+        <div class="slide"><img src="3.jpg" alt="3"></div>
+        <div class="slide"><img src="4.jpg" alt="4"></div>
+        <div class="slide"><img src="5.jpg" alt="5"></div>
+    </div>
+</div>
+
+<div id="splash-overlay" onclick="closeSplash()">
+    <div style="color:white; font-size:2rem; font-weight:bold; z-index:20001;">TAP ANYWHERE TO BEGIN</div>
+    <div class="slider-bg" id="splash-bg"></div>
+</div>
+
+<div id="welcome" class="screen active">
+    <div class="slider-bg" id="welcome-bg"></div>
+    <h1 style="color:white; font-size:3rem; z-index:10;">Welcome to BRWD.</h1>
+    <div class="btn-group" style="z-index:10; display:flex; gap:20px;">
+        <button class="btn" onclick="startOrder('Dine-In')">Dine-In</button>
+        <button class="btn" onclick="startOrder('Take Out')">Take Out</button>
+    </div>
+</div>
+
+<div id="kiosk" class="screen">
+    <div class="menu-wrapper">
+        <div class="sidebar">
+            <img src="logo.jpg" alt="BRWD Logo" class="kiosk-logo-circle">
+            <h3 id="mode-display" style="margin-bottom:20px;"></h3>
+            <div class="category" onclick="loadMenu('coffee')">COFFEE</div>
+            <div class="category" onclick="loadMenu('milktea')">MILKTEA</div>
+            <div class="category" onclick="loadMenu('frappe')">FRAPPE</div>
+            <div class="category" onclick="loadMenu('fruittea')">FRUIT TEA</div>
+            <button class="btn" style="width:100%; background:#8d6e63; margin-top:auto;" onclick="resetSystem()">CANCEL</button>
+        </div>
+        
+        <div class="menu" id="menu-container"></div>
+        
+        <div class="cart-backdrop" id="cart-backdrop" onclick="toggleCart()"></div>
+        <div class="cart" id="cart-sidebar">
+            <h2>Review Your Order</h2>
+            <div id="cart-items"></div>
+            <hr>
+            <div style="display:flex; justify-content: space-between; align-items:center; margin: 15px 0;">
+                <span>Total Amount:</span>
+                <h2 id="total-display" style="margin:0;">₱0</h2>
+            </div>
+            <button class="btn" style="width:100%; margin-bottom:10px;" onclick="openPaymentModal()">PROCEED</button>
+            <button class="btn" style="width:100%; background:transparent; border:1px solid white;" onclick="toggleCart()">CLOSE</button>
+        </div>
+    </div>
+    
+    <button class="mobile-cart-btn" onclick="toggleCart()" id="floating-cart-btn" style="position: fixed; bottom: 30px; right: 30px; background: #5d3d27; color: white; border: none; padding: 12px 25px; border-radius: 30px; font-size: 1.1rem; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 1000; cursor: pointer; display: none; align-items: center; gap: 10px; font-weight: bold;">
+        <span>🛒 Cart</span>
+        <span id="cart-count">0</span>
+    </button>
+</div>
+
+<div class="modal" id="modal"><div class="modal-box" id="modalBox"></div></div>
+<div class="modal" id="paymentModal">
+    <div class="modal-box" style="text-align:center;">
+        <h3 style="color:#774e32">Payment Method</h3>
+        <button class="btn" style="width:100%; margin-bottom:10px;" onclick="handlePayment('GCash')">GCash</button>
+        <button class="btn" style="width:100%;" onclick="handlePayment('Counter')">Counter</button>
+        <button class="btn" style="width:100%; background:#ccc; margin-top:10px;" onclick="closePaymentModal()">Back</button>
+    </div>
+</div>
+
+<div id="gcashPage">
+    <div style="background: white; padding: 20px; border-radius: 15px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 90%; max-width: 350px;">
+        <h2 style="color:#0056d3">Scan to Pay</h2>
+        <img src="685402946_913784561685684_6515915199300598094_n.jpg" class="gcash-qr">
+        <h3 style="margin: 15px 0; color: black;">Total: ₱<span id="gcashTotal"></span></h3>
+        <button class="btn" style="width:100%" onclick="proceedToReceipt()">I HAVE PAID</button>
+    </div>
+</div>
+
+<div id="gcashInstructionPage">
+    <div style="background: white; padding: 20px; border-radius: 15px; text-align: center; width: 90%; max-width: 320px;">
+        <h2 style="color:#0056d3">Screenshot Required</h2>
+        <p style="color: #333;">Take a screenshot of your GCash receipt to show our staff.</p>
+        <button class="btn" style="width:100%" onclick="proceedToReceipt()">DONE</button>
+    </div>
+</div>
+
+<div id="receiptPage">
+    <div id="receipt" style="background:white; padding:20px; border:1px dashed #000; font-family:monospace; width:280px;">
+        <h2 style="text-align:center;">BRWD.</h2>
+        <h3 style="text-align:center;">ORDER #<span id="receiptOrderNum"></span></h3>
+        <hr><div id="receiptItems"></div><hr>
+        <div style="display:flex; justify-content: space-between;"><b>Total:</b><b>₱<span id="receiptTotalDisplay"></span></b></div>
+    </div>
+    <button class="btn" style="margin-top:20px;" onclick="finishOrder()">PRINT & FINISH</button>
+</div>
+
+<div id="thankYouPage">
+    <h1>THANK YOU!</h1>
+    <p>Please wait for your order number.</p>
+    <p>Restarting in <span id="timer">5</span>...</p>
+</div>
+
+<script>
+const firebaseConfig = {
+    apiKey: "AIzaSyD1fsKag_04SFFP1mUXDQwlE5EqafssKSQ",
+    authDomain: "brwd-42b70.firebaseapp.com",
+    databaseURL: "https://brwd-42b70-default-rtdb.firebaseio.com",
+    projectId: "brwd-42b70",
+    storageBucket: "brwd-42b70.firebasestorage.app",
+    messagingSenderId: "974749266877",
+    appId: "1:974749266877:web:89a16b36332c2e8552d8d4"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+const slideHtml = document.getElementById('slideshow-template').innerHTML;
+document.getElementById('splash-bg').innerHTML = slideHtml;
+document.getElementById('welcome-bg').innerHTML = slideHtml;
+
+let cart = [];
+let selectedItem="", selectedCategory="", currentMode="";
+let grain="", temp="", size="", sugar=0, price=0, isCoffeeItem = false;
+let dineInCount = 0, takeOutCount = 0;
+let tempOrderData = null;
+
+function closeSplash() { document.getElementById('splash-overlay').style.display = 'none'; }
+
+const menuData = {
+    coffee: [{ name: "Mocha", img: "mocha.jpg" }, { name: "Caramel Macchiato", img: "caramel_macchiato.jpg" }, { name: "Salted Caramel", img: "salted_caramel.jpg" }, { name: "Vanilla", img: "vanilla.jpg" }, { name: "Sweet Black", img: "sweet_black.jpg" }, { name: "Cafe Latte", img: "cafe_latte.jpg" }, { name: "Coffee Matcha", img: "coffee_matcha.jpg" }, { name: "Americano", img: "americano.jpg" }],
+    milktea: [{ name: "Dark Choco", img: "dark_choco.jpg" }, { name: "Wintermelon", img: "wintermelon.jpg" }, { name: "Okinawa", img: "okinawa.jpg" }, { name: "Cheesecake", img: "cheesecake.jpg" }, { name: "Salted Caramel", img: "salted_caramel_mt.jpg" }, { name: "Cookies and Cream", img: "cookies_cream_mt.jpg" }, { name: "Taro", img: "taro.jpg" }, { name: "Matcha", img: "matcha_mt.jpg" }, { name: "Chocolate", img: "chocolate_mt.jpg" }, { name: "Red Velvet", img: "red_velvet.jpg" }, { name: "Choco Kisses", img: "choco_kisses.jpg" }, { name: "Strawberry", img: "strawberry_mt.jpg" }],
+    frappe: [{ name: "Mocha", img: "mocha_frappe.jpg" }, { name: "Taro", img: "taro_frappe.jpg" }, { name: "Caramel Macchiato", img: "caramel_macchiato_frappe.jpg" }, { name: "Java Chip", img: "javachip.jpg" }, { name: "Cookies and Cream", img: "cookies_cream_frappe.jpg" }, { name: "Coffee Jelly", img: "coffee_jelly.jpg" }, { name: "Cheesecake", img: "cheesecake_frappe.jpg" }, { name: "Chocolate", img: "chocolate_frappe.jpg" }, { name: "Matcha", img: "matcha_frappe.jpg" }],
+    fruittea: [{ name: "Lychee", img: "lychee.jpg" }, { name: "Blueberry", img: "blueberry.jpg" }, { name: "Kiwi", img: "kiwi.jpg" }, { name: "Green Apple", img: "green_apple.jpg" }, { name: "Mango", img: "mango.jpg" }, { name: "Strawberry", img: "strawberry.jpg" }, { name: "Lemon", img: "lemon.jpg" }]
+};
+
+const addOnsList = ["Cream Cheese", "Pearl", "Chocolate Chip", "Whipped Cream", "Coffee Jelly", "Cream Puffs", "Crushed Oreo", "Crystals", "Coffee Shot"];
+
+function startOrder(mode){
+    currentMode = mode;
+    document.getElementById("welcome").classList.remove("active");
+    document.getElementById("kiosk").classList.add("active");
+    document.getElementById("mode-display").innerText = mode;
+    loadMenu('coffee');
+}
+
+function loadMenu(category){
+    selectedCategory = category;
+    const container = document.getElementById("menu-container");
+    let html="";
+    menuData[category].forEach(item=>{
+        html += `<div class="card" onclick="selectItem('${item.name}')">
+                    <img src="${item.img}" onerror="this.src='https://via.placeholder.com/150/ffffff/774e32?text=${item.name}';">
+                    <div>${item.name}</div>
+                 </div>`;
+    });
+    container.innerHTML = html;
+}
+
+function selectItem(item){
+    selectedItem = item;
+    let html="";
+    if(selectedCategory === "coffee"){
+        isCoffeeItem = true;
+        html="<h3 style='color:#774e32'>Select Beans</h3>";
+        ["Arabica","Robusta","Barako"].forEach(g => html += `<button class="btn" style="width:100%; margin-bottom:5px;" onclick="coffeeTemp('${g}')">${g}</button>`);
+    } else {
+        isCoffeeItem = false;
+        let p16 = (selectedCategory === "frappe") ? 59 : 39;
+        let p22 = (selectedCategory === "frappe") ? 69 : 49;
+        html="<h3 style='color:#774e32'>Select Size</h3>";
+        html += `<button class="btn" style="width:100%; margin-bottom:5px;" onclick="setBaseSize('16oz',${p16})">16oz ₱${p16}</button>`;
+        html += `<button class="btn" style="width:100%; margin-bottom:5px;" onclick="setBaseSize('22oz',${p22})">22oz ₱${p22}</button>`;
+    }
+    html += `<button class="btn" style="background:#ccc; width:100%;" onclick="closeModal()">CANCEL</button>`;
+    showModal(html);
+}
+
+function coffeeTemp(g){ grain = g; let html="<h3 style='color:#774e32'>Hot or Iced</h3><button class='btn' style='width:100%; margin-bottom:5px;' onclick=\"coffeeSize('Hot')\">HOT</button><button class='btn' style='width:100%; margin-bottom:5px;' onclick=\"coffeeSize('Iced')\">ICED</button><button class='btn' style='background:#ccc; width:100%;' onclick='closeModal()'>CANCEL</button>"; showModal(html); }
+function coffeeSize(t){ temp = t; let html="<h3 style='color:#774e32'>Select Size</h3>"; if(t === "Hot"){ html += `<button class="btn" style="width:100%; margin-bottom:5px;" onclick="setBaseSize('12oz',49)">12oz ₱49</button>`; } else { html += `<button class="btn" style="width:100%; margin-bottom:5px;" onclick="setBaseSize('16oz',49)">16oz ₱49</button><button class="btn" style="width:100%; margin-bottom:5px;" onclick="setBaseSize('22oz',59)">22oz ₱59</button>`; } html += `<button class='btn' style='background:#ccc; width:100%;' onclick='closeModal()'>CANCEL</button>`; showModal(html); }
+function setBaseSize(s, p){ size = s; price = p; let html="<h3 style='color:#774e32'>Sugar Level</h3>"; [0,25,50,75,100].forEach(level => html += `<button class="btn" style="width:100%; margin-bottom:5px;" onclick="selectAddOns(${level})">${level}%</button>`); html += `<button class='btn' style='background:#ccc; width:100%;' onclick='closeModal()'>CANCEL</button>`; showModal(html); }
+
+function selectAddOns(sLevel){ 
+    sugar = sLevel; 
+    let html="<h3 style='color:#774e32'>ADD-ONS (₱9)</h3>"; 
+    
+    addOnsList.forEach(addon => { 
+        html += `
+        <div class="addon-row" onclick="this.querySelector('input').click(); event.stopPropagation();">
+            <span>${addon}</span>
+            <input type="checkbox" class="addon-check" value="${addon}" onclick="event.stopPropagation();">
+        </div>`; 
+    }); 
+    
+    html += `
+    <button class="btn" style="width:100%; margin-top:10px;" onclick="confirmItem()">CONFIRM</button>
+    <button class="btn" style="background:#ccc; width:100%; margin-top:5px;" onclick="closeModal()">CANCEL</button>`; 
+    showModal(html); 
+}
+
+function confirmItem(){
+    let selectedAddons = [];
+    document.querySelectorAll('.addon-check:checked').forEach(el => selectedAddons.push(el.value));
+    let finalPrice = price + (selectedAddons.length * 9);
+    let addonText = selectedAddons.length > 0 ? ` w/ ${selectedAddons.join(", ")}` : "";
+    let displayName = isCoffeeItem ? `${selectedItem} (${grain}, ${temp}, ${size}, ${sugar}%)${addonText}` : `${selectedItem} (${size}, ${sugar}%)${addonText}`;
+    cart.push({name: displayName, price: finalPrice});
+    closeModal();
+    displayCart();
+}
+
+function displayCart(){
+    let html="", total=0;
+    const cartBtn = document.getElementById("floating-cart-btn");
+    cartBtn.style.display = cart.length > 0 ? "flex" : "none";
+    cart.forEach((item, i)=>{
+        html += `<div style="background:rgba(255,255,255,0.1); padding:10px; border-radius:10px; margin-bottom:10px;">
+                    <div>${item.name}</div>
+                    <div style="display:flex; justify-content:space-between; margin-top:5px;">
+                        <span>₱${item.price}</span>
+                        <button style="background:red; color:white; border:none; border-radius:5px; padding:5px 10px; cursor:pointer;" onclick="removeItem(${i})">Remove</button>
+                    </div>
+                 </div>`;
+        total += item.price;
+    });
+    document.getElementById("cart-items").innerHTML = html || "<p>Empty cart</p>";
+    document.getElementById("total-display").innerText = "₱" + total;
+    document.getElementById("cart-count").innerText = cart.length;
+}
+
+function toggleCart() {
+    const cartEl = document.getElementById("cart-sidebar");
+    const backdrop = document.getElementById("cart-backdrop");
+    cartEl.classList.toggle("open");
+    backdrop.style.display = cartEl.classList.contains("open") ? "block" : "none";
+}
+
+function removeItem(i){ cart.splice(i,1); displayCart(); if(cart.length === 0) toggleCart(); }
+function openPaymentModal() { if(cart.length === 0) return; toggleCart(); document.getElementById("paymentModal").style.display = "flex"; }
+function closePaymentModal() { document.getElementById("paymentModal").style.none = "flex"; document.getElementById("paymentModal").style.display = "none"; }
+
+function handlePayment(method) {
+    closePaymentModal();
+    let total = cart.reduce((sum, item) => sum + item.price, 0);
+    let finalOrderNum = (currentMode === 'Dine-In') ? "D-" + (++dineInCount).toString().padStart(3, '0') : "T-" + (++takeOutCount).toString().padStart(3, '0');
+    tempOrderData = { orderNum: finalOrderNum, items: cart, total: total, mode: currentMode, paymentMethod: method, timestamp: new Date().toISOString() };
+    if(method === 'GCash') { document.getElementById("gcashTotal").innerText = total; document.getElementById("gcashPage").style.display = "flex"; }
+    else { proceedToReceipt(); }
+}
+
+function proceedToReceipt(){
+    if (document.getElementById("gcashPage").style.display === "flex") {
+        document.getElementById("gcashPage").style.display = "none";
+        document.getElementById("gcashInstructionPage").style.display = "flex";
+        return; 
+    }
+    document.getElementById("gcashInstructionPage").style.display = "none";
+    db.ref('orders').push(tempOrderData).then(() => {
+        let receiptHtml = "";
+        tempOrderData.items.forEach(item => { receiptHtml += `<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:5px; color:black;"><span>${item.name}</span><span>₱${item.price}</span></div>`; });
+        document.getElementById("receiptOrderNum").innerText = tempOrderData.orderNum;
+        document.getElementById("receiptItems").innerHTML = receiptHtml;
+        document.getElementById("receiptTotalDisplay").innerText = tempOrderData.total;
+        document.getElementById("receiptPage").style.display = "flex";
+    });
+}
+
+function finishOrder(){ window.print(); document.getElementById("receiptPage").style.display = "none"; document.getElementById("thankYouPage").style.display = "flex"; let seconds = 5; const timerEl = document.getElementById("timer"); const countdown = setInterval(() => { seconds--; timerEl.innerText = seconds; if(seconds <= 0) { clearInterval(countdown); resetSystem(); } }, 1000); }
+
+function resetSystem() {
+    cart = []; displayCart();
+    document.getElementById("kiosk").classList.remove("active");
+    document.getElementById("cart-sidebar").classList.remove("open");
+    document.getElementById("cart-backdrop").style.display = "none";
+    document.getElementById("thankYouPage").style.display = "none";
+    document.getElementById("gcashPage").style.display = "none";
+    document.getElementById('splash-overlay').style.display = 'flex';
+    document.getElementById("welcome").classList.add("active");
+}
+
+function showModal(content){ document.getElementById("modal").style.display="flex"; document.getElementById("modalBox").innerHTML = content; }
+function closeModal(){ document.getElementById("modal").style.display="none"; }
+</script>
+
+</body>
+</html>
