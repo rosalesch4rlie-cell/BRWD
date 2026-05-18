@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BRWD. Coffee and Tea | Management Hub Gateway</title>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #2b2521; /* Rich coffee brown */
+            --accent-color: #c5a880;  /* Coffee cream gold */
+            --bg-color: #f5f0ea;      /* Warm cafe background */
+            --card-bg: #ffffff;
+            --text-color: #1a1a1a;
+            --light-text: #666666;
+            --border-color: #e5dec9;
+            --success-color: #2ed573;
+            --danger-color: #ff4757;
+            --warning-color: #ffa502;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+        aside {
+            width: 260px;
+            background-color: var(--primary-color);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            padding: 20px 0;
+        }
+        .sidebar-brand {
+            padding: 10px 24px 20px 24px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            margin-bottom: 15px;
+        }
+        .sidebar-brand h2 { font-size: 24px; letter-spacing: 1px; }
+        .sidebar-brand p { font-size: 11px; text-transform: uppercase; color: var(--accent-color); letter-spacing: 2px; margin-top: 2px; }
+        .sidebar-menu { list-style: none; flex: 1; }
+        .menu-item-btn {
+            width: 100%;
+            padding: 14px 24px;
+            background: none;
+            border: none;
+            color: #d1c7bd;
+            text-align: left;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.2s;
+        }
+        .menu-item-btn:hover { background: rgba(255,255,255,0.03); color: white; }
+        .menu-item-btn.active { background-color: var(--accent-color); color: var(--primary-color); }
+        .view-frame { flex: 1; display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+        .view-header { background-color: white; border-bottom: 1px solid var(--border-color); padding: 18px 30px; display: flex; justify-content: space-between; align-items: center; }
+        .view-title h3 { font-size: 20px; color: var(--primary-color); }
+        .view-body { flex: 1; padding: 30px; overflow-y: auto; display: none; }
+        .view-body.active { display: block; }
+        .excel-export-btn { background-color: #107c41; color: white; border: none; padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+        .orders-table-wrapper { background: white; border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.02); }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
+        th { background-color: #faf7f2; padding: 14px 20px; color: var(--primary-color); font-weight: 700; border-bottom: 1px solid var(--border-color); }
+        td { padding: 16px 20px; border-bottom: 1px solid #f2ede4; vertical-align: top; }
+        tr:last-child td { border-bottom: none; }
+        .customer-tag { font-weight: 700; color: var(--primary-color); }
+        .order-meta-info { font-size: 12px; color: var(--light-text); margin-top: 2px; }
+        .item-row-pill { background-color: #f7f4ee; padding: 6px 12px; border-radius: 6px; border: 1px solid #eae3d2; margin-bottom: 6px; font-size: 13px; }
+        .item-row-pill:last-child { margin-bottom: 0; }
+        .item-customization-tree { font-size: 11px; color: #7e7367; margin-top: 3px; border-top: 1px dashed #e2dac6; padding-top: 3px; }
+        .price-badge { font-weight: 800; color: var(--primary-color); }
+        .status-dropdown { padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 13px; outline: none; cursor: pointer; border: 1px solid var(--border-color); }
+        .status-dropdown.pending { background-color: #fff9e6; color: #b77c00; border-color: #ffe099; }
+        .status-dropdown.preparing { background-color: #e6f7ff; color: #0066cc; border-color: #91d5ff; }
+        .status-dropdown.completed { background-color: #f6ffed; color: #27ae60; border-color: #b7eb8f; }
+        .status-dropdown.cancelled { background-color: #fff1f0; color: #e74c3c; border-color: #ffa39e; }
+        .inventory-filter-navbar { display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; overflow-x: auto; }
+        .inv-filter-btn { background-color: white; border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 20px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--light-text); transition: all 0.2s; white-space: nowrap; }
+        .inv-filter-btn:hover { border-color: var(--accent-color); color: var(--primary-color); }
+        .inv-filter-btn.active { background-color: var(--primary-color); border-color: var(--primary-color); color: white; }
+        .inventory-grid-box { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+        .inventory-item-card { background: white; border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.02); }
+        .inv-item-top { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; padding-bottom: 12px; border-bottom: 1px dashed var(--border-color); }
+        .inv-glyph { font-size: 28px; background: #faf7f2; padding: 8px; border-radius: 8px; border: 1px solid var(--border-color); }
+        .inv-details h4 { font-size: 16px; color: var(--primary-color); }
+        .inv-details p { font-size: 11px; text-transform: uppercase; color: var(--light-text); letter-spacing: 1px; margin-top: 1px; }
+        .variants-stock-box { display: flex; flex-direction: column; gap: 10px; }
+        .variant-stock-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; background-color: #fcfbfa; padding: 6px 10px; border-radius: 6px; border: 1px solid #f5ede0; }
+        .v-name { font-weight: 600; color: #554e48; }
+        .v-controls { display: flex; align-items: center; gap: 10px; }
+        .stock-adjust-btn { background-color: white; border: 1px solid var(--border-color); width: 24px; height: 24px; border-radius: 4px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: all 0.2s; }
+        .stock-adjust-btn:hover { border-color: var(--accent-color); background-color: #faf9f6; }
+        .stock-value-view { font-weight: 800; font-size: 14px; min-width: 25px; text-align: center; }
+        .stock-value-view.low { color: var(--danger-color); background-color: #fff1f0; padding: 2px 6px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+<aside>
+    <div class="sidebar-brand">
+        <h2>BRWD.</h2>
+        <p>Hub Management</p>
+    </div>
+    <ul class="sidebar-menu">
+        <li><button class="menu-item-btn active" onclick="switchControlPanel('orders', this)">📋 Customer Orders</button></li>
+        <li><button class="menu-item-btn" onclick="switchControlPanel('inventory', this)">📦 Stock Inventory</button></li>
+    </ul>
+</aside>
+<div class="view-frame">
+    <div class="view-header">
+        <div class="view-title"><h3 id="panelTitleDisplay">Customer Orders</h3></div>
+        <div class="view-actions" id="headerActionsArea">
+            <button class="excel-export-btn" onclick="exportOrdersToExcelSheet()">📥 Export Orders Log</button>
+        </div>
+    </div>
+    <div class="view-body active" id="ordersPanel">
+        <div class="orders-table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Customer / Date</th>
+                        <th>Tray Items Ordered</th>
+                        <th>Total Billing</th>
+                        <th>Order Processing Status</th>
+                    </tr>
+                </thead>
+                <tbody id="ordersTableBody">
+                    <tr><td colspan="4" style="text-align: center; color: var(--light-text); padding: 30px;">Connecting to database pipeline stream...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="view-body" id="inventoryPanel">
+        <div class="inventory-filter-navbar" id="invFilterNav">
+            <button class="inv-filter-btn active" onclick="filterInv('all', this)">All Items</button>
+            <button class="inv-filter-btn" onclick="filterInv('coffee', this)">☕ Coffee</button>
+            <button class="inv-filter-btn" onclick="filterInv('milktea', this)">🧋 Milk Tea</button>
+            <button class="inv-filter-btn" onclick="filterInv('frappe', this)">🥤 Regular Frappe</button>
+            <button class="inv-filter-btn" onclick="filterInv('frappesupreme', this)">👑 Frappe Supreme</button>
+            <button class="inv-filter-btn" onclick="filterInv('fruittea', this)">🍹 Fruit Tea</button>
+            <button class="inv-filter-btn" onclick="filterInv('pastry', this)">🥐 Pastries</button>
+            <button class="inv-filter-btn" onclick="filterInv('special', this)">✨ Special Menu</button>
+        </div>
+        <div class="inventory-grid-box" id="inventoryGridContainer"></div>
+    </div>
+</div>
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyCOMZVeg3Y7Tj6VQEVBxKO02MTPKr8Ockc",
+        authDomain: "brwd-coffee.firebaseapp.com",
+        projectId: "brwd-coffee",
+        storageBucket: "brwd-coffee.firebasestorage.app",
+        messagingSenderId: "1095603563895",
+        appId: "1:1095603563895:web:7b84a643a192fbbc374572",
+        measurementId: "G-9CE5Q61VJ1"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const menuProducts = [
+        { id: "c1", name: 'Mocha', category: 'coffee', glyph: '☕', prices: { '16oz Iced': 49, '22oz Iced': 59, '12oz Hot': 49 } },
+        { id: "c2", name: 'Caramel Macchiato', category: 'coffee', glyph: '☕', prices: { '16oz Iced': 49, '22oz Iced': 59, '12oz Hot': 49 } },
+        { id: "c3", name: 'Salted Caramel', category: 'coffee', glyph: '☕', prices: { '16oz Iced': 49, '22oz Iced': 59, '12oz Hot': 49 } },
+        { id: "c4", name: 'Vanilla', category: 'coffee', glyph: '☕', prices: { '16oz Iced': 49, '22oz Iced': 59, '12oz Hot': 49 } },
+        { id: "c5", name: 'Sweet Black', category: 'coffee', glyph: '☕', prices: { '16oz Iced': 49, '22oz Iced': 59, '12oz Hot': 49 } },
+        { id: "c6", name: 'Cafe Latte', category: 'coffee', glyph: '☕', prices: { '16oz Iced': 49, '22oz Iced': 59, '12oz Hot': 49 } },
+        { id: "c7", name: 'Coffee Matcha', category: 'coffee', glyph: '🍵', prices: { '16oz Iced': 49, '22oz Iced': 59, '12oz Hot': 49 } },
+        { id: "c8", name: 'Americano', category: 'coffee', glyph: '☕', prices: { '16oz Iced': 49, '22oz Iced': 59, '12oz Hot': 49 } },
+        { id: "m1", name: 'Dark Choco Milk Tea', category: 'milktea', glyph: '🧋', prices: { '16oz': 39, '22oz': 49 } },
+        { id: "m2", name: 'Wintermelon Milk Tea', category: 'milktea', glyph: '🧋', prices: { '16oz': 39, '22oz': 49 } },
+        { id: "m3", name: 'Okinawa Milk Tea', category: 'milktea', glyph: '🧋', prices: { '16oz': 39, '22oz': 49 } },
+        { id: "m4", name: 'Cheesecake Milk Tea', category: 'milktea', glyph: '🧋', prices: { '16oz': 39, '22oz': 49 } },
+        { id: "m5", name: 'Salted Caramel Milk Tea', category: 'milktea', glyph: '🧋', prices: { '16oz': 39, '22oz': 49 } },
+        { id: "m6", name: 'Cookies and Cream Milk Tea', category: 'milktea', glyph: '🧋', prices: { '16oz': 39, '22oz': 49 } },
+        { id: "m7", name: 'Taro Milk Tea', category: 'milktea', glyph: '🧋', prices: { '16oz': 39, '22oz': 49 } },
+        { id: "m8", name: 'Matcha Milk Tea', category: 'milktea', glyph: '🧋', prices: { '16oz': 39, '22oz': 49 } },
+        { id: "m9", name: 'Chocolate Milk Tea', category: 'milktea', glyph: '🧋', prices: { '16oz': 39, '22oz': 49 } },
+        { id: "m10", name: 'Red Velvet Milk Tea', category: 'milktea', glyph: '🧋', prices: { '16oz': 39, '22oz': 49 } },
+        { id: "m11", name: 'Choco Kisses Milk Tea', category: 'milktea', glyph: '🧋', prices: { '16oz': 39, '22oz': 49 } },
+        { id: "m12", name: 'Strawberry Milk Tea', category: 'milktea', glyph: '🧋', prices: { '16oz': 39, '22oz': 49 } },
+        { id: "f1", name: 'Vanilla Frappe', category: 'frappe', glyph: '🥤', prices: { '16oz': 59, '22oz': 69 } },
+        { id: "f2", name: 'Mocha Frappe', category: 'frappe', glyph: '🥤', prices: { '16oz': 59, '22oz': 69 } },
+        { id: "f3", name: 'Taro Frappe', category: 'frappe', glyph: '🥤', prices: { '16oz': 59, '22oz': 69 } },
+        { id: "f4", name: 'Caramel Macchiato Frappe', category: 'frappe', glyph: '🥤', prices: { '16oz': 59, '22oz': 69 } },
+        { id: "f5", name: 'Java Chip Frappe', category: 'frappe', glyph: '🥤', prices: { '16oz': 59, '22oz': 69 } },
+        { id: "f6", name: 'Cookies and Cream Frappe', category: 'frappe', glyph: '🥤', prices: { '16oz': 59, '22oz': 69 } },
+        { id: "f7", name: 'Coffee Jelly Frappe', category: 'frappe', glyph: '🥤', prices: { '16oz': 59, '22oz': 69 } },
+        { id: "f8", name: 'Cheesecake Frappe', category: 'frappe', glyph: '🥤', prices: { '16oz': 59, '22oz': 69 } },
+        { id: "f9", name: 'Chocolate Frappe', category: 'frappe', glyph: '🥤', prices: { '16oz': 59, '22oz': 69 } },
+        { id: "f10", name: 'Matcha Frappe', category: 'frappe', glyph: '🥤', prices: { '16oz': 59, '22oz': 69 } },
+        { id: "f11", name: 'Strawberry Frappe', category: 'frappe', glyph: '🥤', prices: { '22oz': 69 } },
+        { id: "fs1", name: 'Vanilla Frappe Supreme', category: 'frappesupreme', glyph: '👑', prices: { '16oz': 77, '22oz': 87 } },
+        { id: "fs2", name: 'Mocha Frappe Supreme', category: 'frappesupreme', glyph: '👑', prices: { '16oz': 77, '22oz': 87 } },
+        { id: "fs3", name: 'Taro Frappe Supreme', category: 'frappesupreme', glyph: '👑', prices: { '16oz': 77, '22oz': 87 } },
+        { id: "fs4", name: 'Caramel Macchiato Frappe Supreme', category: 'frappesupreme', glyph: '👑', prices: { '16oz': 77, '22oz': 87 } },
+        { id: "fs5", name: 'Java Chip Frappe Supreme', category: 'frappesupreme', glyph: '👑', prices: { '16oz': 77, '22oz': 87 } },
+        { id: "fs6", name: 'Cookies and Cream Frappe Supreme', category: 'frappesupreme', glyph: '👑', prices: { '16oz': 77, '22oz': 87 } },
+        { id: "fs7", name: 'Coffee Jelly Frappe Supreme', category: 'frappesupreme', glyph: '👑', prices: { '16oz': 77, '22oz': 87 } },
+        { id: "fs8", name: 'Cheesecake Frappe Supreme', category: 'frappesupreme', glyph: '👑', prices: { '16oz': 77, '22oz': 87 } },
+        { id: "fs9", name: 'Chocolate Frappe Supreme', category: 'frappesupreme', glyph: '👑', prices: { '16oz': 77, '22oz': 87 } },
+        { id: "fs10", name: 'Matcha Frappe Supreme', category: 'frappesupreme', glyph: '👑', prices: { '16oz': 77, '22oz': 87 } },
+        { id: "fs11", name: 'Strawberry Frappe Supreme', category: 'frappesupreme', glyph: '👑', prices: { '22oz': 87 } },
+        { id: "ft1", name: 'Lychee Fruit Tea', category: 'fruittea', glyph: '🍹', prices: { '16oz': 39, '22oz': 49 } },
+        { id: "ft2", name: 'Blueberry Fruit Tea', category: 'fruittea', glyph: '🍹', prices: { '16oz': 39, '22oz': 49 } },
+        { id: "ft3", name: 'Kiwi Fruit Tea', category: 'fruittea', glyph: '🍹', prices: { '16oz': 39, '22oz': 49 } },
+        { id: "ft4", name: 'Green Apple Fruit Tea', category: 'fruittea', glyph: '🍹', prices: { '16oz': 39, '22oz': 49 } },
+        { id: "ft5", name: 'Mango Fruit Tea', category: 'fruittea', glyph: '🍹', prices: { '16oz': 39, '22oz': 49 } },
+        { id: "ft6", name: 'Strawberry Fruit Tea', category: 'fruittea', glyph: '🍹', prices: { '16oz': 39, '22oz': 49 } },
+        { id: "ft7", name: 'Lemon Fruit Tea', category: 'fruittea', glyph: '🍹', prices: { '16oz': 39, '22oz': 49 } },
+        { id: "ft8", name: 'Passion Fruit Tea', category: 'fruittea', glyph: '🍹', prices: { '16oz': 39, '22oz': 49 } },
+        { id: "ft9", name: 'Honey Peach Fruit Tea', category: 'fruittea', glyph: '🍹', prices: { '16oz': 39, '22oz': 49 } },
+        { id: "p1", name: 'Musubi', category: 'pastry', glyph: '🥐', prices: { 'Standard': 45 } },
+        { id: "p2", name: 'Brownies (Solo)', category: 'pastry', glyph: '🥐', prices: { 'Standard': 55 } },
+        { id: "p3", name: 'Brownies (Pack)', category: 'pastry', glyph: '🥐', prices: { 'Standard': 115 } },
+        { id: "s1", name: 'Hot Chocolate (Non-Coffee)', category: 'special', glyph: '🍫', prices: { '12oz Hot': 49 } },
+        { id: "s2", name: 'Dark Strawberry Frappe', category: 'special', glyph: '🍓', prices: { '16oz': 79, '22oz': 89 } },
+        { id: "s3", name: 'Dark Strawberry (Classic)', category: 'special', glyph: '🍓', prices: { '16oz': 49, '22oz': 59 } },
+        { id: "s4", name: 'Yogurt Fruit Drinks', category: 'special', glyph: '🥛', prices: { '16oz': 49, '22oz': 59 } },
+        { id: "s5", name: 'Strawberry Matcha', category: 'special', glyph: '🍵', prices: { '16oz': 49, '22oz': 59 } },
+        { id: "s6", name: 'Matcha Latte', category: 'special', glyph: '🍵', prices: { '16oz': 49, '22oz': 59 } },
+        { id: "s7", name: 'Fruit Milk', category: 'special', glyph: '🥛', prices: { '16oz': 49, '22oz': 59 } }
+    ];
+
+    let cachedOrdersList = [];
+    let inventoryLevels = {};
+    let activeInventoryCategory = 'all';
+
+    window.addEventListener('DOMContentLoaded', () => {
+        initializeOrdersPipelineListener();
+        initializeInventoryPipelineListener();
+    });
+
+    function switchControlPanel(targetPanelKey, elementButtonNode) {
+        document.querySelectorAll('.menu-item-btn').forEach(b => b.classList.remove('active'));
+        elementButtonNode.classList.add('active');
+
+        document.querySelectorAll('.view-body').forEach(panel => panel.classList.remove('active'));
+        document.getElementById('headerActionsArea').style.display = (targetPanelKey === 'orders') ? "block" : "none";
+
+        if(targetPanelKey === 'orders') {
+            document.getElementById('panelTitleDisplay').innerText = "Customer Orders";
+            document.getElementById('ordersPanel').classList.add('active');
+        } else {
+            document.getElementById('panelTitleDisplay').innerText = "Stock Inventory";
+            document.getElementById('inventoryPanel').classList.add('active');
+            renderInventoryGrid(activeInventoryCategory);
+        }
+    }
+
+    function initializeOrdersPipelineListener() {
+        db.collection("orders").orderBy("timestamp", "desc")
+          .onSnapshot((querySnapshot) => {
+              cachedOrdersList = [];
+              const tbody = document.getElementById('ordersTableBody');
+              tbody.innerHTML = "";
+
+              if(querySnapshot.empty) {
+                  tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--light-text);">No orders found.</td></tr>`;
+                  return;
+              }
+
+              querySnapshot.forEach((doc) => {
+                  const data = doc.data();
+                  data.docId = doc.id;
+                  cachedOrdersList.push(data);
+
+                  let formattedDate = "Just now";
+                  if(data.timestamp) {
+                      const t = data.timestamp.toDate();
+                      formattedDate = t.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + " | " + t.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                  }
+
+                  let itemsHTML = "";
+                  if(data.items && Array.isArray(data.items)) {
+                      data.items.forEach(i => {
+                          let traits = [];
+                          if(i.grainVariant && i.grainVariant !== "N/A") traits.push(`Grains: ${i.grainVariant}`);
+                          if(i.sugarLevel && i.sugarLevel !== "N/A") traits.push(`Sugar: ${i.sugarLevel}`);
+                          if(i.addonsSelected && i.addonsSelected.length > 0) traits.push(`Addons: ${i.addonsSelected.join(', ')}`);
+
+                          itemsHTML += `
+                              <div class="item-row-pill">
+                                  <strong>${i.purchasedQuantity}x</strong> ${i.productName} (${i.selectedSize})
+                                  ${traits.length > 0 ? `<div class="item-customization-tree">${traits.join(' | ')}</div>` : ''}
+                              </div>
+                          `;
+                      });
+                  }
+
+                  const currentStatus = data.orderStatus || "Pending";
+                  const statusClassMap = currentStatus.toLowerCase();
+
+                  const tr = document.createElement('tr');
+                  tr.innerHTML = `
+                      <td>
+                          <div class="customer-tag">${data.customerName || "Anonymous"}</div>
+                          <div class="order-meta-info">${formattedDate}</div>
+                          <div class="order-meta-info" style="font-family: monospace; color:#a89e94;">ID: ${doc.id}</div>
+                      </td>
+                      <td>${itemsHTML}</td>
+                      <td>
+                          <div class="price-badge">₱${data.totalAmount ? data.totalAmount.toFixed(2) : "0.00"}</div>
+                          <div class="order-meta-info">${data.paymentMethod || "Counter"}</div>
+                      </td>
+                      <td>
+                          <select class="status-dropdown ${statusClassMap}" onchange="updateOrderStatusOnCloud('${doc.id}', this)">
+                              <option value="Pending" ${currentStatus === 'Pending' ? 'selected' : ''}>⏳ Pending</option>
+                              <option value="Preparing" ${currentStatus === 'Preparing' ? 'selected' : ''}>☕ Preparing</option>
+                              <option value="Completed" ${currentStatus === 'Completed' ? 'selected' : ''}>✅ Completed</option>
+                              <option value="Cancelled" ${currentStatus === 'Cancelled' ? 'selected' : ''}>❌ Cancelled</option>
+                          </select>
+                      </td>
+                  `;
+                  tbody.appendChild(tr);
+              });
+          }, (error) => {
+              console.error(error);
+          });
+    }
+
+    function updateOrderStatusOnCloud(docId, selectElementNode) {
+        const nextValue = selectElementNode.value;
+        selectElementNode.className = "status-dropdown " + nextValue.toLowerCase();
+        db.collection("orders").doc(docId).update({ orderStatus: nextValue })
+          .catch(e => alert("Failed to modify database record state."));
+    }
+
+    function exportOrdersToExcelSheet() {
+        if(cachedOrdersList.length === 0) { alert("No transaction records found to export."); return; }
+        
+        let flattenedRows = [];
+        cachedOrdersList.forEach(order => {
+            let stamp = "N/A";
+            if(order.timestamp) {
+                const d = order.timestamp.toDate();
+                stamp = d.getFullYear() + "-" + (d.getMonth()+1) + "-" + d.getDate() + " " + d.toTimeString().split(' ')[0];
+            }
+
+            if(order.items && Array.isArray(order.items)) {
+                order.items.forEach(i => {
+                    flattenedRows.push({
+                        "Order Reference ID": order.docId,
+                        "Timestamp": stamp,
+                        "Customer Name": order.customerName || "Anonymous",
+                        "Payment Protocol": order.paymentMethod || "Counter",
+                        "Billing Total (PHP)": order.totalAmount || 0,
+                        "Global Status": order.orderStatus || "Pending",
+                        "Product Name": i.productName || "N/A",
+                        "Size Variant": i.selectedSize || "N/A",
+                        "Grain Selection": i.grainVariant || "N/A",
+                        "Sugar Level": i.sugarLevel || "N/A",
+                        "Addons Array": i.addonsSelected ? i.addonsSelected.join(', ') : "None",
+                        "Unit Pricing": i.itemUnitPrice || 0,
+                        "Quantity Ordered": i.purchasedQuantity || 0
+                    });
+                });
+            }
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(flattenedRows);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Orders Log Master");
+        XLSX.writeFile(workbook, `BRWD_Orders_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+    }
+
+    function initializeInventoryPipelineListener() {
+        db.collection("inventory").onSnapshot((querySnapshot) => {
+            inventoryLevels = {};
+            querySnapshot.forEach(doc => {
+                inventoryLevels[doc.id] = doc.data();
+            });
+            renderInventoryGrid(activeInventoryCategory);
+        });
+    }
+
+    function renderInventoryGrid(categoryKey) {
+        activeInventoryCategory = categoryKey;
+        const container = document.getElementById('inventoryGridContainer');
+        container.innerHTML = "";
+
+        let matchingProducts = menuProducts;
+        if(categoryKey !== 'all') {
+            matchingProducts = menuProducts.filter(p => p.category === categoryKey);
+        }
+
+        matchingProducts.forEach(product => {
+            let variantsHTML = "";
+            const sizesList = Object.keys(product.prices);
+
+            sizesList.forEach(variantKey => {
+                const productCloudData = inventoryLevels[product.id] || {};
+                const currentStock = productCloudData[variantKey] !== undefined ? productCloudData[variantKey] : 15;
+                const lowStockWarningClass = currentStock <= 5 ? "low" : "";
+
+                variantsHTML += `
+                    <div class="variant-stock-row">
+                        <span class="v-name">${variantKey}</span>
+                        <div class="v-controls">
+                            <button class="stock-adjust-btn" onclick="adjustVariantStock('${product.id}', '${variantKey}', -1)">-</button>
+                            <span class="stock-value-view ${lowStockWarningClass}">${currentStock}</span>
+                            <button class="stock-adjust-btn" onclick="adjustVariantStock('${product.id}', '${variantKey}', 1)">+</button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            const card = document.createElement("div");
+            card.className = "inventory-item-card";
+            card.innerHTML = `
+                <div class="inv-item-top">
+                    <div class="inv-glyph">${product.glyph}</div>
+                    <div class="inv-details">
+                        <h4>${product.name}</h4>
+                        <p>${product.category}</p>
+                    </div>
+                </div>
+                <div class="variants-stock-box">${variantsHTML}</div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    function adjustVariantStock(productId, variantKey, changeValue) {
+        const docRef = db.collection("inventory").doc(productId);
+        
+        db.runTransaction((transaction) => {
+            return transaction.get(docRef).then((doc) => {
+                let currentStock = 15;
+                if (doc.exists && doc.data()[variantKey] !== undefined) {
+                    currentStock = doc.data()[variantKey];
+                }
+                let finalStock = currentStock + changeValue;
+                if (finalStock < 0) finalStock = 0;
+                
+                transaction.set(docRef, { [variantKey]: finalStock }, { merge: true });
+            });
+        }).catch((error) => {
+            console.error("Inventory Adjust Error: ", error);
+        });
+    }
+
+    function filterInv(category, element) {
+        document.querySelectorAll('.inv-filter-btn').forEach(b => b.classList.remove('active'));
+        element.classList.add('active');
+        renderInventoryGrid(category);
+    }
+</script>
+</body>
+</html>
